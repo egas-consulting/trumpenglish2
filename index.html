@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Face Lineup</title>
+
+  <!-- Google Fonts - Roboto -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" />
+  <!-- D3.js Library -->
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+
+  <style>
+    /* General Styles */
+    body {
+      font-family: 'Roboto', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #EFF1F3;
+      text-align: center;
+    }
+
+    .chart-container {
+      width: 95%;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 20px 0;
+    }
+
+    /* Responsive Filters */
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px; /* Increased spacing for better readability */
+      margin-bottom: 10px;
+    }
+
+    .filters .filter-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center; /* Ensures text stays aligned */
+      gap: 5px; /* Adjust button spacing */
+    }
+
+    @media (max-width: 768px) {
+      .filters {
+        flex-direction: row; /* Ensure buttons try to stay in a row */
+        flex-wrap: wrap;
+      }
+
+      .filters .filter-group {
+        flex-direction: row; /* Keep buttons in the same row */
+      }
+    }
+
+    @media (max-width: 480px) {
+      .filters {
+        justify-content: center;
+        gap: 5px; /* Reduce gap for smaller screens */
+      }
+
+      .filters .filter-group {
+        flex-direction: column; /* Allow vertical stacking for better readability */
+      }
+
+      .filters button {
+        font-size: 10px;
+        padding: 3px 6px;
+      }
+    }
+
+    .filters .filter-group strong {
+      white-space: nowrap; /* Prevents text wrapping */
+      margin-right: 5px;
+    }
+
+    /* Button Styling */
+    .filters button {
+      padding: 5px 8px; /* Reduced padding */
+      font-size: 12px; /* Slightly smaller font */
+      border: 1px solid #8F99AD; /* Original border */
+      border-radius: 6px; /* Rounded corners */
+      background: transparent; /* Maintain transparency */
+      color: #2C2D41; /* Text color */
+      font-weight: 500;
+      cursor: pointer; /* Pointer cursor */
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    /* Active Button Styling */
+    .filters button.active {
+      background-color: #2C2D41;
+      color: #EFF1F3;
+    }
+
+    /* Responsive Face Display */
+    .faces-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      padding: 20px;
+    }
+
+    .face {
+      width: 8vw; /* Dynamically sized */
+      max-width: 80px;
+      height: auto;
+      cursor: pointer;
+      transition: transform 0.2s ease;
+      border-radius: 50%;
+    }
+
+    .face:hover {
+      transform: scale(1.1);
+    }
+
+    /* Highlight Selected Face */
+    .face.selected {
+      border: 3px solid #2C2D41;
+    }
+
+    /* Tooltip Styling */
+    .tooltip {
+      position: absolute;
+      background-color: rgba(255, 255, 255, 0.85);
+      border: 1px solid #999;
+      padding: 10px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+      font-size: 13px;
+      font-family: 'Roboto', sans-serif;
+      color: #2C2D41;
+      border-radius: 5px;
+      z-index: 10;
+      max-width: 250px;
+      text-align: left;
+    }
+
+    @media (max-width: 480px) {
+      .face {
+        width: 15vw;
+      }
+      .filters .filter-group {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="chart-container">
+    <!-- Filters Section -->
+    <div class="filters">
+      <!-- Gender Filter Group -->
+      <div class="filter-group">
+        <strong>Gender:</strong>
+        <button id="filterGenderMale">Male</button>
+        <button id="filterGenderFemale">Female</button>
+        <button id="filterGenderAll" class="active">All</button>
+      </div>
+
+      <!-- Age Filter Group -->
+      <div class="filter-group">
+        <strong>Age:</strong>
+        <button id="filterAgeUnder40">Under 40</button>
+        <button id="filterAge40_60">40-60</button>
+        <button id="filterAgeOver60">Over 60</button>
+        <button id="filterAgeAll" class="active">All</button>
+      </div>
+
+      <!-- Position Type Filter Group -->
+      <div class="filter-group">
+        <strong>Position Type:</strong>
+        <button id="filterPositionCabinet">Cabinet</button>
+        <button id="filterPositionExternal">External and Institutions</button>
+        <button id="filterPositionHouse">White House</button>
+        <button id="filterPositionPresident">President and Vice President</button>
+        <button id="filterPositionAll" class="active">All</button>
+      </div>
+    </div>
+
+    <!-- Faces Display Container -->
+    <div id="facesContainer" class="faces-container"></div>
+
+    <!-- Tooltip -->
+    <div id="tooltip" class="tooltip"></div>
+  </div>
+
+  <script>
+    let selectedId = null;
+    let hoveredId = null;
+
+    // Data Array
+    let data = [
+      {
+        id: 1,
+        name: "Tulsi Gabbard",
+        role: "Intelligence Services Director",
+        age: 43,
+        wealth: "N/A",
+        faceDefault: "gabbard1.png",
+        faceHover: "gabbard.png",
+        image: "gabbard2.png",
+        gender: "f",
+        positionType: "cabinet",
+        height: "N/A",
+        length: "N/A",
+        equator: "N/A"
+      },
+      {
+        id: 4,
+        name: "Doug Collins",
+        role: "Secretary for Veterans Affairs",
+        age: 58,
+        wealth: "N/A",
+        faceDefault: "collins1.png",
+        faceHover: "collins.png",
+        image: "collins2.png",
+        gender: "m",
+        positionType: "cabinet",
+        height: "N/A",
+        length: "N/A",
+        equator: "N/A"
+      },
+      {
+        id: 5,
+        name: "Brooke Rollins",
+        role: "Secretary for Agriculture",
+        age: 52,
+        wealth: "N/A",
+        faceDefault: "rollins1.png",
+        faceHover: "rollins.png",
+        image: "rollins2.png",
+        gender: "f",
+        positionType: "cabinet",
+        height: "N/A",
+        length: "N/A",
+        equator: "N/A"
+      },
+      {
+        id: 6,
+        name: "Sean Duffy",
+        role: "Secretary for Transportation",
+        age: 53,
+        wealth: "N/A",
+        faceDefault: "duffy1.png",
+        faceHover: "duffy.png",
+        image: "duffy2.png",
+        gender: "m",
+        positionType: "cabinet",
+        height: "N/A",
+        length: "N/A",
+        equator: "N/A"
+      },
+      {
+        id: 7,
+        name: "Martin A. Makary",
+        role: "Secretary for Food and Drugs",
+        age: 54,
+        wealth: "N/A",
+        faceDefault: "makary1.png",
+        faceHover: "makary.png",
+        image: "makary2.png",
+        gender: "m",
+        positionType: "external",
+        height: "N/A",
+        length: "N/A",
+        equator: "N/A"
+      },
+      {
+        id: 8,
+        name: "Matthew G. Whitaker",
+        role: "Ambassador to NATO",
+        age: 55,
+        wealth: "N/A",
+        faceDefault: "whitaker1.png",
+        faceHover: "whitaker.png",
+        image: "whitaker2.png",
+        gender: "m",
+        positionType: "external",
+        height: "N/A",
+        length: "N/A",
+        equator: "N/A"
+      },
+      {
+        id: 10,
+        name: "Dave Weldon",
+        role: "Director of Centers for Disease Control and Prevention",
+        age: 71,
+        wealth: "N/A",
+        faceDefault: "weldon1.png",
+        faceHover: "weldon.png",
+        image: "weldon2.png",
+        gender: "m",
+        positionType: "external",
+        height: "N/A",
+        length: "N/A",
+        equator: "N/A"
+      },
+      {
+        id: 11,
+        name: "Janette Nesheiwat",
+        role: "Surgeon General",
+        age: 48,
+        wealth: "N/A",
+        faceDefault: "nesheiwat1.png",
+        faceHover: "nesheiwat.png",
+        image: "nesheiwat2.png",
+        gender: "f",
+        positionType: "external",
+        height: "N/A",
+        length: "N/A",
+        equator: "N/A"
+      },
+      {
+        id: 12,
+        name: "Russell T. Vought",
+        role: "White House Communications Director",
+        age: 48,
+        wealth: "N/A",
+        faceDefault: "vought1.png",
+        faceHover: "vought.png",
+        image: "vought2.png",
+        gender: "m",
+        positionType: "external",
+        height: "N/A",
+        length: "N/A",
+        equator: "N/A"
+      },
+      {
+        id: 13,
+        name: "Stephen Miran",
+        role: "President of the Economic Advisory Council",
+        age: "N/A",
+        wealth: "N/A",
+        faceDefault: "miran1.png",
+        faceHover: "miran.png",
+        image: "miran2.png",
+        gender: "m",
+        positionType: "external",
+        height: "N/A",
+        length: "N/A",
+        equator: "N/A"
+      },
+      {
+        id: 15,
+        name: "Jamieson Greer",
+        role: "U.S. Trade Representative",
+        age: 45,
+        wealth: "N/A",
+        faceDefault: "greer1.png",
+        faceHover: "greer.png",
+        image: "greer2.png",
+        gender: "m",
+        positionType: "cabinet",
+        height: "N/A",
+        length: "N/A",
+        equator: "N/A"
+      },
+      {
+        id: 16,
+        name: "Jay Bhattacharya",
+        role: "Director of Health Institutes",
+        age: 57,
+        wealth: "N/A",
+        faceDefault: "bhattacharya1.png",
+        faceHover: "bhattacharya.png",
+        image: "bhattacharya2.png",
+        gender: "m",
+        positionType: "external",
+        height: "N/A",
+        length: "N/A",
+        equator: "N/A"
+      },
+      {
+        id: 17,
+        name: "John Phelan",
+        role: "Secretary for the Navy",
+        age: 61,
+        wealth: "N/A",
+        faceDefault: "phelan1.png",
+        faceHover: "phelan.png",
+        image: "phelan2.png",
+        gender: "m",
+        positionType: "external",
+        height: "N/A",
+        length: "N/A",
+        equator: "N/A"
+      },
+      {
+        id: 18,
+        name: "Daniel Driscoll",
+        role: "Secretary for the Army",
+        age: 39,
+        wealth: "N/A",
+        faceDefault: "driscoll1.png",
+        faceHover: "driscoll.png",
+        image: "driscoll2.png",
+        gender: "m",
+        positionType: "external",
+        height: "N/A",
+        length: "N/A",
+        equator: "N/A"
+      },
+      {
+        id: 19,
+        name: "Paul Atkins",
+        role: "Chair of the Securities and Exchange Commission",
+        age: 66,
+        wealth: "N/A",
+        faceDefault: "atkins1.png",
+        faceHover: "atkins.png",
+        image: "atkins2.png",
+        gender: "m",
+        positionType: "external",
+        height: "N/A",
+        length: "N/A",
+        equator: "N/A"
+      },
+      {
+        id: 20,
+        name: "Brandon Judd",
+        role: "Ambassador to the Bahamas",
+        age: "N/A",
+        wealth: "N/A",
+        faceDefault: "judd1.png",
+        faceHover: "judd.png",
+        image: "judd2.png",
+        gender: "m",
+        positionType: "external",
+        height: "N/A",
+        length: "N/A",
+        equator: "N/A"
+      },
+      {
+        id: 21,
+        name: "Ronald D. Johnson",
+        role: "Ambassador to Mexico",
+        age: "N/A",
+        wealth: "N/A",
+        faceDefault: "johnson1.png",
+        faceHover: "johnson.png",
+        image: "johnson2.png",
+        gender: "m",
+        positionType: "external",
+        height: "N/A",
+        length: "N/A",
+        equator: "N/A"
+      },
+      {
+        id: 22,
+        name: "Herschel Walker",
+        role: "Ambassador to the Bahamas",
+        age: 62,
+        wealth: "N/A",
+        faceDefault: "walker1.png",
+        faceHover: "walker.png",
+        image: "walker2.png",
+        gender: "m",
+        positionType: "external",
+        height: "N/A",
+        length: "N/A",
+        equator: "N/A"
+      },
+      {
+        id: 49,
+        name: "Susie Wiles",
+        role: "White House Chief of Staff",
+        age: 67,
+        wealth: "N/A",
+        faceDefault: "wiles1.png",
+        faceHover: "wiles.png",
+        image: "wiles2.png",
+        gender: "f",
+        positionType: "house",
+        height: "N/A",
+        length: "N/A",
+        equator: "N/A"
+      },
+      {
+        id: 50,
+        name: "Thomas Homan",
+        role: "Border Situation Officer",
+        age: 63,
+        wealth: "N/A",
+        faceDefault: "homan1.png",
+        faceHover: "homan.png",
+        image: "homan2.png",
+        gender: "m",
+        positionType: "house",
+        height: "N/A",
+        length: "N/A",
+        equator: "N/A"
+      },
+      {
+        id: 51,
+        name: "Michael Waltz",
+        role: "National Security Advisor",
+        age: 50,
+        wealth: "N/A",
+        faceDefault: "waltz1.png",
+        faceHover: "waltz.png",
+        image: "waltz2.png",
+        gender: "m",
+        positionType: "house",
+        height: "N/A",
+        length: "N/A",
+        equator: "N/A"
+      },
+      {
+        id: 52,
+        name: "Steven Cheung",
+        role: "White House Communications Director",
+        age: 42,
+        wealth: "N/A",
+        faceDefault: "cheung1.png",
+        faceHover: "cheung.png",
+        image: "cheung2.png",
+        gender: "m",
+        positionType: "house",
+        height: "N/A",
+        length: "N/A",
+        equator: "N/A"
+      },
+      {
+        id: 53,
+        name: "Karoline Leavitt",
+        role: "White House Press Secretary",
+        age: 27,
+        wealth: "N/A",
+        faceDefault: "leavitt1.png",
+        faceHover: "leavitt.png",
+        image: "leavitt2.png",
+        gender: "f",
+        positionType: "house",
+        height: "N/A",
+        length: "N/A",
+        equator: "N/A"
+      },
+      {
+        id: 56,
+        name: "Sebastian Gorka",
+        role: "Deputy Assistant to President Donald Trump for Combating Terrorism",
+        age: 54,
+        wealth: "N/A",
+        faceDefault: "gorka1.png",
+        faceHover: "gorka.png",
+        image: "gorka2.png",
+        gender: "m",
+        positionType: "house",
+        height: "N/A",
+        length: "N/A",
+        equator: "N/A"
+      },
+      {
+        id: 58,
+        name: "Keith Kellogg",
+        role: "Representative for Ukraine and Russia",
+        age: 80,
+        wealth: "N/A",
+        faceDefault: "kellogg1.png",
+        faceHover: "kellogg.png",
+        image: "kellogg2.png",
+        gender: "m",
+        positionType: "external",
+        height: "N/A",
+        length: "N/A",
+        equator: "N/A"
+      },
+      {
+        id: 60,
+        name: "Alina Habba",
+        role: "President's Counselor",
+        age: 40,
+        wealth: "N/A",
+        faceDefault: "habba1.png",
+        faceHover: "habba.png",
+        image: "habba2.png",
+        gender: "f",
+        positionType: "house",
+        height: "N/A",
+        length: "N/A",
+        equator: "N/A"
+      },
+      {
+        id: 62,
+        name: "Kari Lake",
+        role: "Director of Voice of America",
+        age: 55,
+        wealth: "N/A",
+        faceDefault: "lake1.png",
+        faceHover: "lake.png",
+        image: "lake2.png",
+        gender: "f",
+        positionType: "external",
+        height: "N/A",
+        length: "N/A",
+        equator: "N/A"
+      }
+      // Add more data as needed...
+    ];
+
+    const facesContainer = d3.select("#facesContainer");
+    const tooltip = d3.select("#tooltip");
+
+    /**
+     * Function to render faces based on filtered data
+     * @param {Array} dataArray - Array of data objects to render
+     */
+    function render(dataArray) {
+      facesContainer.html(""); // Clear existing faces
+
+      dataArray.forEach(d => {
+        const img = facesContainer.append("img")
+          .attr("class", "face")
+          .attr("src", d.faceDefault)
+          .attr("data-id", d.id)
+          .on("mouseover", function(event) {
+            hoveredId = d.id;
+            d3.select(this).attr("src", d.faceHover);
+            tooltip
+              .html(`<strong>${d.name}</strong><br/>${d.role}<br/>Age: ${d.age}`)
+              .style("opacity", 1)
+              .style("left", (event.pageX + 10) + "px")
+              .style("top", (event.pageY + 10) + "px");
+          })
+          .on("mousemove", function(event) {
+            tooltip.style("left", (event.pageX + 10) + "px").style("top", (event.pageY + 10) + "px");
+          })
+          .on("mouseout", function() {
+            hoveredId = null;
+            d3.select(this).attr("src", d.faceDefault);
+            tooltip.style("opacity", 0);
+          })
+          .on("click", function() {
+            d3.selectAll(".face").classed("selected", false);
+            selectedId = d.id;
+            d3.select(this).classed("selected", true);
+          });
+      });
+    }
+
+    /**
+     * Function to set up filter buttons with custom filter functions
+     * @param {string} buttonId - The ID of the button
+     * @param {Function|null} filterFn - The filter function to apply, or null to show all
+     */
+    function setupFilterButton(buttonId, filterFn) {
+      document.getElementById(buttonId).addEventListener("click", () => {
+        // Remove 'active' class from all buttons in the same filter group
+        const filterGroup = document.getElementById(buttonId).parentElement;
+        filterGroup.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+        // Add 'active' class to the clicked button
+        document.getElementById(buttonId).classList.add("active");
+
+        // Apply the filter function
+        const filteredData = filterFn ? data.filter(filterFn) : data;
+        render(filteredData);
+      });
+    }
+
+    // Gender Filters
+    setupFilterButton("filterGenderMale", d => d.gender === "m");
+    setupFilterButton("filterGenderFemale", d => d.gender === "f");
+    setupFilterButton("filterGenderAll", null); // Show all
+
+    // Age Filters
+    setupFilterButton("filterAgeUnder40", d => typeof d.age === 'number' && d.age < 40);
+    setupFilterButton("filterAge40_60", d => typeof d.age === 'number' && d.age >= 40 && d.age <= 60);
+    setupFilterButton("filterAgeOver60", d => typeof d.age === 'number' && d.age > 60);
+    setupFilterButton("filterAgeAll", null); // Show all
+
+    // Position Type Filters
+    setupFilterButton("filterPositionCabinet", d => d.positionType === "cabinet");
+    setupFilterButton("filterPositionExternal", d => d.positionType === "external");
+    setupFilterButton("filterPositionHouse", d => d.positionType === "house");
+    setupFilterButton("filterPositionPresident", d => d.positionType === "president and vice");
+    setupFilterButton("filterPositionAll", null); // Show all
+
+    // Initial Render
+    render(data);
+
+    // Handle Initial Active States by triggering click on active buttons
+    document.querySelectorAll(".filters .filter-group").forEach(group => {
+      const activeBtn = group.querySelector(".active");
+      if (activeBtn) {
+        activeBtn.click();
+      }
+    });
+
+    // Optional: Handle click outside to deselect
+    document.addEventListener("click", function(event) {
+      if (!event.target.classList.contains("face")) {
+        d3.selectAll(".face").classed("selected", false);
+        selectedId = null;
+      }
+    });
+
+    /**
+     * Function to send the document's height to the parent window
+     * (Useful if embedding in an iframe)
+     */
+    function sendHeight() {
+      window.parent.postMessage(document.body.scrollHeight, "*");
+    }
+
+    // Event listeners to send height on load and resize
+    window.addEventListener("load", sendHeight);
+    window.addEventListener("resize", sendHeight);
+  </script>
+
+</body>
+</html>
